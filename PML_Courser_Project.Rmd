@@ -1,0 +1,90 @@
+---
+title: "Practical Machine Learning Course Project - Predict movement manner"
+---
+##Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+In the anaysis below, I will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they did the exercise.The data for this project come from this source: <http://groupware.les.inf.puc-rio.br/har>.
+
+##Machine Learning Practice
+###Step 1 Load data 
+```{r}
+training = read.csv("~/pml-training.csv")
+testing = read.csv("~/pml-testing.csv")
+dim(training)
+dim(testing)
+```
+summary(training)
+The data sets have 160 columns, 159 features and 1 predictor. 
+
+###Step 2 Pre-pocess data
+load necessary libraries
+```{r}
+library(caret)
+```
+Quality of input data is important in machine learning. Thus, before bulding model, I have to clean the data in the following a couple steps
+**a) Remove near zero variance columns**
+```{r}
+nzvCol <- nearZeroVar(training)
+training1<-training[,-nzvCol]
+dim(training1) 
+testing1<-testing[,-nzvCol]
+```
+I successfully removed 60 columns.
+
+**b) Remove columns which have NA values more than 50%**
+It would be a noise if NA value in a column is more than 50%. I would like to remove them. Also, the first two columns are basically id and names, which are irrelavant with model building. I would remove the first two columns too.
+```{r}
+rmvCol=c(1,2)
+training2 <- training1 
+
+for(i in 1:length(training1)) { #loop each column in the dataset
+  if( sum( is.na( training1[, i] ) ) /nrow(training1) >= 0.5 ) { #if more than half values are NA
+    for(j in 1:length(training1)) {
+      if( length( grep(names(training1[i]), names(training1)[j]) ) ==1)  { #if the columns are the same:
+        rmvCol=c(rmvCol,j)
+      }   
+    } 
+  }
+}
+
+training2<-training1[,-rmvCol]
+testing2<-testing1[,-rmvCol]
+dim(training2)
+```
+As a result, another 43 columns have been removed. The final training and testing datasets have 57 columns. 
+
+###Step 3 Slice data
+I will assign 75% of the data to "trainSet" to train my model and the rest 25% to testSet to cross validate my model.
+```{r}
+set.seed(911) # For reproducibile purpose
+inTrain <- createDataPartition(training2$classe, p=0.75, list=FALSE)
+trainSet <- training2[inTrain, ]
+testSet <- training2[-inTrain, ]
+```
+
+###Step 4 Build model
+I started with the top performing Random Forest algorism to build my prediction model. I also used 5-fold cross validation when applying the algorithm. The accuracy with sample data is great than 99.2%, which is very good.
+```{r}
+controlRf <- trainControl(method="cv", 5)
+modelFitRF <- train(classe ~ ., data=trainSet, method="rf", trControl=controlRf)
+modelFitRF
+```
+
+###Step 5 Estimate error on testSet
+The model accuracy on testSet is 99.98% and the out of sample error is 0.02%, which is pretty good. The high accuracy gave me confident to apply the model to the final testing dataset.
+```{r}
+predictRF <- predict(modelFitRF, testSet)
+confusionMatrix(testSet$classe, predictRF)
+```
+
+###Step 6 Predict on testing dataset
+The prediction outcome turns out to be 100% accurate!
+```{r}
+result <- predict(modelFitRF, testing2)
+result
+```
+
+##Conclusion
+My model with Random Forest algorism solves this issue very well, which proves Random Forest is a high performance algorims. Also, through this practice, I feel that Randome Forest is a time-consuming algorism. 
+
